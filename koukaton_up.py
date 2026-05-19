@@ -250,7 +250,7 @@ def main():
         pygame.draw.rect(screen, WHITE, (arrow_x, player_draw_y + 15, 5, 5))
 
         # 情報表示 (UI)
-        ui_text = font.render(f"Floor: {current_floor} / {TOTAL_FLOORS}   Max: {max_height // 10}m", True, WHITE)
+        ui_text = font.render(f"Floor: {current_floor} / {TOTAL_FLOORS}   Height: {current_height // 10}m   Max: {max_height // 10}m", True, WHITE)
         screen.blit(ui_text, (10, 10))
 
         # ゴールした時の演出
