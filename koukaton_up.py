@@ -75,7 +75,7 @@ class Platform:
 # 2. クラスを操作する関数
 # ==========================================
 
-def update_player(player, keys, platforms, goal_block):
+def update_player(player, keys, platforms, goal_block, jump_sound):
     """プレイヤーの物理挙動と状態を更新する関数"""
     
     # ゴール済みの場合は入力を受け付けない（重力で落ちるだけ）
@@ -101,6 +101,10 @@ def update_player(player, keys, platforms, goal_block):
                     
                     player.set_vel_y(-power * 0.9 - 5)
                     player.set_vel_x(direction * (power * 0.4 + 2))
+                    
+                    """ジャンプ効果音の再生"""
+                    if jump_sound:
+                        jump_sound.play()
                     
                     player.set_is_charging(False)
                     player.set_charge_power(0)
@@ -135,6 +139,9 @@ def update_player(player, keys, platforms, goal_block):
             player.set_vel_y(0)
             player.set_is_clear(True)
 
+            # ゴール時にBGMを滑らかに停止させる
+            pygame.mixer.music.fadeout(2000)
+
     # --- 4. 足場との当たり判定 ---
     player.set_on_ground(False)
     if player.get_vel_y() > 0:
@@ -155,11 +162,25 @@ def update_player(player, keys, platforms, goal_block):
 
 def main():
     pygame.init()
+    """オーディオ機能の初期化"""
+    pygame.mixer.init()
+    
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Jump King - 10 Floors to Goal")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont(None, 36)
     large_font = pygame.font.SysFont(None, 72)
+
+    """サウンドファイルの読み込みと再生設定 """
+    jump_sound = None
+    if os.path.exists("jump.wav"):
+        jump_sound = pygame.mixer.Sound("jump.wav")
+        jump_sound.set_volume(0.4)  # SEの音量 (0.0 ~ 1.0)
+
+    if os.path.exists("BGM.mp3"):
+        pygame.mixer.music.load("BGM.mp3")
+        pygame.mixer.music.set_volume(0.25)  # BGMの音量 (0.0 ~ 1.0)
+        pygame.mixer.music.play(-1)  # ループ再生
 
     player = Player()
     
@@ -194,8 +215,8 @@ def main():
 
         keys = pygame.key.get_pressed()
         
-        # 関数呼び出し (ゴールブロックも渡して判定させる)
-        update_player(player, keys, platforms, goal_block)
+        # 関数呼び出し (ゴールブロック、効果音オブジェクトを渡す)
+        update_player(player, keys, platforms, goal_block, jump_sound)
 
         p_rect = player.get_rect()
 
