@@ -23,8 +23,10 @@ GOLD = (255, 215, 0)  # ゴールブロック用の金色
 
 class Player:
     def __init__(self):
-        self._image = pygame.Surface((30, 40))
-        self._image.fill(BLUE)
+
+        self.image_original = pygame.image.load("9.png")
+        self.image_original = pygame.transform.scale(self.image_original, (30, 40))
+        self._image = self.image_original
         self._rect = self._image.get_rect(center=(WIDTH // 2, HEIGHT - 100))
         
         self._vel_x = 0
@@ -86,8 +88,10 @@ def update_player(player, keys, platforms, goal_block):
             
             if keys[pygame.K_LEFT] or keys[pygame.K_a]:
                 player.set_direction(-1)
+                player._image = pygame.transform.flip(player.image_original, True, False)
             if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                 player.set_direction(1)
+                player._image = player.image_original
 
             if keys[pygame.K_SPACE]:
                 player.set_is_charging(True)
@@ -163,6 +167,9 @@ def main():
 
     player = Player()
     
+    bg_large = pygame.image.load("background_all.png")
+    bg_large = pygame.transform.scale(bg_large, (600, 2400))
+    
     # --- 10層分のマップ生成 ---
     platforms = []
     platforms.append(Platform(0, HEIGHT - 40, WIDTH, 40, GREEN)) # スタート床
@@ -222,7 +229,9 @@ def main():
         current_floor = min((current_height // HEIGHT) + 1, TOTAL_FLOORS)
 
         # --- 描画処理 ---
-        screen.fill(BLACK)
+        bg_y = (1600 + camera_y) % 2400
+        src_rect = pygame.Rect(0, bg_y, 600, 800)
+        screen.blit(bg_large, (0, 0), src_rect)
 
         # ゴールの描画
         goal_rect = goal_block.get_rect()
