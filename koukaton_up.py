@@ -355,6 +355,8 @@ def main():
         ui_text = font.render(f"Floor: {display_floor} / {TOTAL_FLOORS}   Max: {max_height // 10}m", True, WHITE)
         screen.blit(ui_text, (10, 10))
 
+        # 情報表示 (UI)
+        draw_ui(screen, font, player, current_floor, TOTAL_FLOORS, current_height, max_height)
         if player.get_is_clear():
             clear_text = large_font.render("CLEAR!!", True, GOLD)
             text_rect = clear_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
