@@ -336,7 +336,7 @@ def main():
     pygame.mixer.init()
     
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Jump King - Colored Gimmicks")
+    pygame.display.set_caption("koukaton UP!!")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont(None, 36)
     large_font = pygame.font.SysFont(None, 72)
