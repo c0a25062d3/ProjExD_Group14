@@ -63,6 +63,7 @@ class Player:
         
         # クリエイティブモード用のフラグ
         self._is_creative = False
+        self._has_cheated = False  # クリエイティブを使用したかの記録
 
     # --- ゲッター ---
     def get_image(self): return self._image
@@ -78,6 +79,7 @@ class Player:
     def get_on_ice(self): return self._on_ice
     def get_is_reset(self): return self._is_reset
     def get_is_creative(self): return self._is_creative
+    def get_has_cheated(self): return self._has_cheated
 
     # --- セッター ---
     def set_vel_x(self, value): self._vel_x = value
@@ -90,6 +92,7 @@ class Player:
     def set_on_ice(self, value): self._on_ice = value
     def set_is_reset(self, value): self._is_reset = value
     def set_is_creative(self, value): self._is_creative = value
+    def set_has_cheated(self, value): self._has_cheated = value
 
 
 class Platform:
@@ -114,6 +117,7 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
         # --- クリエイティブモードの切り替え ---
         if keys[pygame.K_LSHIFT] and keys[pygame.K_c]:
             player.set_is_creative(True)
+            player.set_has_cheated(True)  # クリエイティブを使ったフラグを立てる（記録更新不可になる）
             player.set_vel_x(0)
             player.set_vel_y(0)
             player.set_is_charging(False)
@@ -144,11 +148,7 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
             if rect.left < 0: rect.left = 0
             if rect.right > WIDTH: rect.right = WIDTH
 
-            # ゴール判定（一応残す）
-            goal_rect = goal_block.get_rect()
-            if rect.colliderect(goal_rect):
-                player.set_is_clear(True)
-                pygame.mixer.music.fadeout(2000)
+            # クリエイティブモード中はゴール判定を行わない（すり抜ける）
                 
             return  # ここで処理を終了し、通常の物理演算（重力や当たり判定）をスキップ
 
@@ -263,6 +263,8 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
                         player.set_vel_y(0)
                         player.set_vel_x(0)
                         player.set_is_reset(True) 
+                        # トラップで一番下に戻ったときは、記録更新不可のペナルティを解除
+                        player.set_has_cheated(False)
                         break
 
                     # 通常の足場の着地処理
@@ -307,8 +309,9 @@ def draw_ui(screen, font, player, current_floor, total_floors, current_height, m
     height_text = font.render(f"Height: {current_height // 10} m", True, LIGHT_BLUE)
     screen.blit(height_text, (panel_x + 15, panel_y + 70))
 
-    # 最高到達点
-    max_text = font.render(f"Best: {max_height // 10} m", True, ORANGE)
+    # 最高到達点 (チートフラグが立っている間は記録が止まっていることを微妙に色で伝える)
+    max_color = ORANGE if not player.get_has_cheated() else (150, 150, 150)
+    max_text = font.render(f"Best: {max_height // 10} m", True, max_color)
     screen.blit(max_text, (panel_x + 180, panel_y + 70))
 
     # クリエイティブモードの表示
@@ -347,53 +350,97 @@ def main():
     
     bg_large = pygame.image.load("background_all.png")
     bg_large = pygame.transform.scale(bg_large, (600, 2400))
+    
+    TOTAL_FLOORS = 10
     platforms = []
     
+    # 床（一番下）
     platforms.append(Platform(0, HEIGHT - 40, WIDTH, 40, COLOR_NORMAL, "normal")) 
+    
+    # 完全に固定された、上に行くほど難しくなるクリア可能なステージデータ
+    # 形式: (x座標, y座標, 幅, ギミック種類)
+    fixed_level_data = [
+        # Floor 1 (Easy - 広くて近い)
+        (100, 600, 150, "normal"),
+        (400, 450, 150, "normal"),
+        (150, 300, 150, "normal"),
+        (350, 150, 150, "normal"),
+        (250, 0, 150, "normal"),
+        
+        # Floor 2 (Easy - 少し狭くなる)
+        (50, -150, 120, "normal"),
+        (400, -300, 120, "normal"),
+        (100, -450, 120, "normal"),
+        (350, -600, 120, "normal"),
+        (200, -750, 120, "normal"),
+        
+        # Floor 3 (氷の床 初登場)
+        (450, -900, 100, "normal"),
+        (150, -1050, 100, "ice"),
+        (400, -1200, 100, "normal"),
+        (200, -1350, 100, "ice"),
+        (100, -1500, 100, "normal"),
+        
+        # Floor 4 (トランポリン 初登場)
+        (350, -1650, 100, "trampoline"),
+        (100, -2100, 120, "normal"), # トランポリンで大きく跳んだ先
+        (400, -2250, 100, "normal"),
+        (200, -2400, 100, "normal"),
+        
+        # Floor 5 (すり抜ける罠 初登場)
+        (50, -2550, 100, "normal"),
+        (400, -2600, 100, "fake"),   # 偽物
+        (400, -2700, 100, "normal"), # 本物
+        (150, -2850, 100, "ice"),
+        (350, -3000, 100, "fake"),
+        (350, -3050, 100, "normal"),
+        (100, -3200, 100, "normal"),
+        
+        # Floor 6 (幅が狭くなる)
+        (450, -3350, 80, "normal"),
+        (200, -3500, 80, "ice"),
+        (50, -3650, 80, "trampoline"),
+        (350, -4100, 80, "normal"),
+        
+        # Floor 7 (トラップ床 初登場)
+        (150, -4250, 80, "normal"),
+        (400, -4400, 80, "trap"),    # 触れると一番下へ
+        (450, -4500, 80, "normal"),  # トラップを飛び越えた先
+        (100, -4650, 80, "normal"),
+        (250, -4800, 80, "ice"),
+        
+        # Floor 8 (複合ギミック)
+        (450, -4950, 70, "normal"),
+        (200, -5100, 70, "fake"),
+        (150, -5200, 70, "normal"),
+        (300, -5350, 70, "trap"),
+        (50, -5450, 70, "normal"),
+        (400, -5600, 70, "trampoline"),
+        
+        # Floor 9 (終盤・かなり狭い)
+        (100, -6050, 70, "normal"),
+        (400, -6200, 70, "ice"),
+        (150, -6350, 70, "trap"),
+        (200, -6450, 70, "normal"),
+        
+        # Floor 10 (最後の関門)
+        (450, -6600, 60, "normal"),
+        (250, -6750, 60, "ice"),
+        (50, -6900, 60, "trampoline"), # これに乗ればゴールへ一気に飛べる
+        (200, -7200, 100, "fake")      # ゴール直前の目隠し（すり抜ける）
+    ]
 
-    TOTAL_FLOORS = 10
+    # 固定データをインスタンス化してリストに追加
+    for data in fixed_level_data:
+        x, y, w, plat_type = data
+        platforms.append(Platform(x, y, w, 20, COLOR_MAP[plat_type], plat_type))
+
     goal_y = (HEIGHT - 40) - (HEIGHT * TOTAL_FLOORS)
     goal_block = Platform(0, goal_y, WIDTH, 40, GOLD, "goal")
 
-    for f in range(TOTAL_FLOORS):
-        floor_bottom = HEIGHT - (f * HEIGHT)
-        floor_top = HEIGHT - ((f + 1) * HEIGHT)
-        
-        floor_plats = []
-        plat_y = floor_bottom - 150
-        
-        while plat_y > floor_top + 50:
-            w = random.randint(60, 130)
-            x = random.randint(0, WIDTH - w)
-            floor_plats.append(Platform(x, plat_y, w, 20, COLOR_NORMAL, "normal"))
-            gap_y = random.randint(80, 130)
-            plat_y -= gap_y
-            
-        if len(floor_plats) >= 2:
-            special_type = random.choice(["fake", "ice", "trampoline"])
-            
-            # 10階の場合：ランダム特殊床1つ ＋ トラップ床1つ
-            if f == TOTAL_FLOORS - 1:
-                specials = random.sample(range(len(floor_plats)), 2)
-                
-                p_spec = floor_plats[specials[0]]
-                # 種類に応じた色（COLOR_MAP[special_type]）を適用
-                floor_plats[specials[0]] = Platform(p_spec.get_rect().x, p_spec.get_rect().y, p_spec.get_rect().width, 20, COLOR_MAP[special_type], special_type)
-                
-                p_trap = floor_plats[specials[1]]
-                # 赤色を適用
-                floor_plats[specials[1]] = Platform(p_trap.get_rect().x, p_trap.get_rect().y, p_trap.get_rect().width, 20, COLOR_TRAP, "trap")
-            
-            # 1〜9階の場合：ランダム特殊床1つ
-            else:
-                special_idx = random.choice(range(len(floor_plats)))
-                p_spec = floor_plats[special_idx]
-                floor_plats[special_idx] = Platform(p_spec.get_rect().x, p_spec.get_rect().y, p_spec.get_rect().width, 20, COLOR_MAP[special_type], special_type)
-                
-        platforms.extend(floor_plats)
-
     camera_y = 0
     max_height = 0
+    clear_time = None  # クリアした瞬間の時間を保存する変数
 
     running = True
     while running:
@@ -426,7 +473,8 @@ def main():
             camera_y = 0
 
         current_height = (HEIGHT - 40) - p_rect.bottom
-        if current_height > max_height:
+        # ★ 不正行為（クリエイティブ使用）フラグが立っていない場合のみ記録を更新
+        if current_height > max_height and not player.get_has_cheated():
             max_height = current_height
             
         current_floor = min((current_height // HEIGHT) + 1, TOTAL_FLOORS)
@@ -464,6 +512,10 @@ def main():
         draw_ui(screen, font, player, current_floor, TOTAL_FLOORS, current_height, max_height)
         
         if player.get_is_clear():
+            # 初回クリア時に時間を記録
+            if clear_time is None:
+                clear_time = pygame.time.get_ticks()
+
             clear_text = large_font.render("CLEAR!!", True, GOLD)
             text_rect = clear_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
             screen.blit(clear_text, text_rect)
@@ -471,6 +523,17 @@ def main():
             sub_text = font.render("CONGRATULATIONS!", True, WHITE)
             sub_rect = sub_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 10))
             screen.blit(sub_text, sub_rect)
+            
+            # 残り秒数を表示（おまけ）
+            elapsed = pygame.time.get_ticks() - clear_time
+            remaining = max(0, 10 - (elapsed // 1000))
+            close_text = font.render(f"Closing in {remaining} seconds...", True, LIGHT_BLUE)
+            close_rect = close_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 60))
+            screen.blit(close_text, close_rect)
+            
+            # 10秒（10000ミリ秒）経過で終了
+            if elapsed >= 10000:
+                running = False
 
         pygame.display.flip()
         clock.tick(FPS)
