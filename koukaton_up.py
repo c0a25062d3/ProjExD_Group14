@@ -24,7 +24,7 @@ GOLD = (255, 215, 0)  # ゴールブロック用の金色
 class Player:
     def __init__(self):
 
-        self.image_original = pygame.image.load("9.png")
+        self.image_original = pygame.image.load("9.png")#背景読み込み
         self.image_original = pygame.transform.scale(self.image_original, (30, 40))
         self._image = self.image_original
         self._rect = self._image.get_rect(center=(WIDTH // 2, HEIGHT - 100))
