@@ -15,6 +15,11 @@ BLUE = (100, 150, 255)
 WHITE = (255, 255, 255)
 GOLD = (255, 215, 0)
 
+DARK_PANEL = (35, 35, 45)
+PANEL_BORDER = (90, 90, 110)
+LIGHT_BLUE = (120, 200, 255)                #左上UI
+ORANGE = (255, 170, 80)
+
 # ギミック床の色定義を復活
 COLOR_NORMAL = (120, 120, 120)       # 緑（通常）
 COLOR_FAKE = (180, 0, 180)           # 紫（すり抜ける）
@@ -192,6 +197,35 @@ def update_player(player, keys, platforms, goal_block):
                         player.set_vel_x(0)
                     break
 
+def draw_ui(screen, font, player, current_floor, total_floors, current_height, max_height):
+
+    # UIのサイズ
+    panel_x = 10
+    panel_y = 10
+    panel_w = 300
+    panel_h = 120
+
+    # 背景のパネル
+    panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+    pygame.draw.rect(screen, DARK_PANEL, panel_rect, border_radius=12)
+    pygame.draw.rect(screen, PANEL_BORDER, panel_rect, 2, border_radius=12)
+    # タイトル
+    title_text = font.render("STATUS", True, GOLD)
+    screen.blit(title_text, (panel_x + 15, panel_y + 10))
+
+    # 階層
+    floor_text = font.render(f"Floor {current_floor} / {total_floors}", True, WHITE)
+    screen.blit(floor_text, (panel_x + 15, panel_y + 42))
+
+    # 高さ
+    height_text = font.render(f"Height: {current_height // 10} m", True, LIGHT_BLUE)
+    screen.blit(height_text, (panel_x + 15, panel_y + 70))
+
+    # 最高到達点
+    max_text = font.render(f"Best: {max_height // 10} m", True, ORANGE)
+    screen.blit(max_text, (panel_x + 180, panel_y + 70))
+
+
 
 # ==========================================
 # 3. メインループ
@@ -321,6 +355,8 @@ def main():
         ui_text = font.render(f"Floor: {display_floor} / {TOTAL_FLOORS}   Max: {max_height // 10}m", True, WHITE)
         screen.blit(ui_text, (10, 10))
 
+        # 情報表示 (UI)
+        draw_ui(screen, font, player, current_floor, TOTAL_FLOORS, current_height, max_height)
         if player.get_is_clear():
             clear_text = large_font.render("CLEAR!!", True, GOLD)
             text_rect = clear_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
