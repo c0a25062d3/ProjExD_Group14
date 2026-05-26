@@ -375,8 +375,10 @@ def main():
         current_floor = min((current_height // HEIGHT) + 1, TOTAL_FLOORS)
         display_floor = max(1, current_floor)
 
-        bg_y = (1600 + camera_y) % 2400
-        src_rect = pygame.Rect(0, bg_y, 600, 800)
+        bg_y = 1600 + (camera_y*0.2)
+        if bg_y < 0:
+            bg_y = 0
+        src_rect = pygame.Rect(0, int(bg_y), 600, 800)
         screen.blit(bg_large, (0, 0), src_rect)
 
         goal_rect = goal_block.get_rect()
