@@ -143,6 +143,7 @@ def update_player(player, keys, platforms, goal_block):
 
     rect = player.get_rect()
 
+    # X軸方向の移動と、足場の【左右】の当たり判定
     rect.x += player.get_vel_x()
     if rect.left < 0:
         rect.left = 0
@@ -153,6 +154,20 @@ def update_player(player, keys, platforms, goal_block):
         player.set_vel_x(player.get_vel_x() * -0.5)
         player.set_direction(-1)
 
+    # 追加：足場の左右側面との衝突をチェック
+    for plat in platforms:
+        plat_rect = plat.get_rect()
+        if rect.colliderect(plat_rect):
+            if player.get_vel_x() > 0:  # 右移動中に衝突
+                rect.right = plat_rect.left
+                player.set_vel_x(player.get_vel_x() * -0.5)
+                player.set_direction(-1)
+            elif player.get_vel_x() < 0:  # 左移動中に衝突
+                rect.left = plat_rect.right
+                player.set_vel_x(player.get_vel_x() * -0.5)
+                player.set_direction(1)
+
+    # Y軸方向の移動
     rect.y += int(player.get_vel_y())
 
     goal_rect = goal_block.get_rect()
@@ -165,21 +180,25 @@ def update_player(player, keys, platforms, goal_block):
     player.set_on_ground(False)
     player.set_on_ice(False)
 
-    if player.get_vel_y() > 0:
-        for plat in platforms:
-            if plat.get_type() == "fake":
-                continue
+    # 足場の判定ループ（インデントを修正して中に一括で格納）
+    for plat in platforms:
+        if plat.get_type() == "fake":
+            continue
                 
-            plat_rect = plat.get_rect()
-            if rect.colliderect(plat_rect):
+        plat_rect = plat.get_rect()
+        if rect.colliderect(plat_rect):
+            # もともとの上面判定（落下中の着地判定）
+            if player.get_vel_y() > 0:
                 if rect.bottom <= plat_rect.top + player.get_vel_y() + 1:
                     
+                    # トランポリン床
                     if plat.get_type() == "trampoline":
                         rect.bottom = plat_rect.top
                         player.set_vel_y(-25) 
                         player.set_on_ground(False)
                         break
                     
+                    # トラップ床
                     if plat.get_type() == "trap":
                         rect.center = (WIDTH // 2, HEIGHT - 100) 
                         player.set_vel_y(0)
@@ -187,15 +206,23 @@ def update_player(player, keys, platforms, goal_block):
                         player.set_is_reset(True) 
                         break
 
+                    # 通常の足場の着地処理
                     rect.bottom = plat_rect.top
                     player.set_vel_y(0)
-                    player.set_on_ground(True)
                     
                     if plat.get_type() == "ice":
                         player.set_on_ice(True)
                     else:
-                        player.set_vel_x(0)
+                        player.set_on_ice(False)
+
+                    player.set_on_ground(True)
                     break
+
+            # 追加：上昇中に足場の【下側（天井部分）】に頭をぶつけた判定
+            elif player.get_vel_y() < 0:
+                rect.top = plat_rect.bottom
+                player.set_vel_y(0)  # 上昇を止める
+                break
 
 def draw_ui(screen, font, player, current_floor, total_floors, current_height, max_height):
 
@@ -224,7 +251,6 @@ def draw_ui(screen, font, player, current_floor, total_floors, current_height, m
     # 最高到達点
     max_text = font.render(f"Best: {max_height // 10} m", True, ORANGE)
     screen.blit(max_text, (panel_x + 180, panel_y + 70))
-
 
 
 # ==========================================
