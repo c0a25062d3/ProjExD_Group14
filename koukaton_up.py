@@ -20,7 +20,7 @@ PANEL_BORDER = (90, 90, 110)
 LIGHT_BLUE = (120, 200, 255)                #左上UI
 ORANGE = (255, 170, 80)
 
-# ギミック床の色定義を復活
+# ギミック床の色定義
 COLOR_NORMAL = (120, 120, 120)       # 緑（通常）
 COLOR_FAKE = (180, 0, 180)           # 紫（すり抜ける）
 COLOR_ICE = (100, 200, 255)          # 水色（滑る）
@@ -43,7 +43,6 @@ COLOR_MAP = {
 
 class Player:
     def __init__(self):
-
         self.image_original = pygame.image.load("9.png")#背景読み込み
         self.image_original = pygame.transform.scale(self.image_original, (30, 40))
         self._image = self.image_original
@@ -61,6 +60,9 @@ class Player:
         self._is_clear = False
         self._on_ice = False      
         self._is_reset = False    
+        
+        # クリエイティブモード用のフラグ
+        self._is_creative = False
 
     # --- ゲッター ---
     def get_image(self): return self._image
@@ -75,6 +77,7 @@ class Player:
     def get_is_clear(self): return self._is_clear
     def get_on_ice(self): return self._on_ice
     def get_is_reset(self): return self._is_reset
+    def get_is_creative(self): return self._is_creative
 
     # --- セッター ---
     def set_vel_x(self, value): self._vel_x = value
@@ -86,6 +89,7 @@ class Player:
     def set_is_clear(self, value): self._is_clear = value
     def set_on_ice(self, value): self._on_ice = value
     def set_is_reset(self, value): self._is_reset = value
+    def set_is_creative(self, value): self._is_creative = value
 
 
 class Platform:
@@ -106,6 +110,49 @@ class Platform:
 
 def update_player(player, keys, platforms, goal_block, jump_sound):
     if not player.get_is_clear():
+        
+        # --- クリエイティブモードの切り替え ---
+        if keys[pygame.K_LSHIFT] and keys[pygame.K_c]:
+            player.set_is_creative(True)
+            player.set_vel_x(0)
+            player.set_vel_y(0)
+            player.set_is_charging(False)
+            player.set_charge_power(0)
+        elif keys[pygame.K_LSHIFT] and keys[pygame.K_a]:
+            player.set_is_creative(False)
+
+        # --- クリエイティブモード中の処理 ---
+        if player.get_is_creative():
+            speed = 10
+            rect = player.get_rect()
+            
+            # 十字キー または WASD で移動
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                rect.x -= speed
+                player.set_direction(-1)
+                player._image = pygame.transform.flip(player.image_original, True, False)
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                rect.x += speed
+                player.set_direction(1)
+                player._image = player.image_original
+            if keys[pygame.K_UP] or keys[pygame.K_w]:
+                rect.y -= speed
+            if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                rect.y += speed
+
+            # 画面端の制限 (X軸のみ)
+            if rect.left < 0: rect.left = 0
+            if rect.right > WIDTH: rect.right = WIDTH
+
+            # ゴール判定（一応残す）
+            goal_rect = goal_block.get_rect()
+            if rect.colliderect(goal_rect):
+                player.set_is_clear(True)
+                pygame.mixer.music.fadeout(2000)
+                
+            return  # ここで処理を終了し、通常の物理演算（重力や当たり判定）をスキップ
+
+        # --- 通常の操作と物理演算 ---
         if player.get_on_ground():
             
             if player.get_on_ice():
@@ -147,7 +194,7 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
 
     rect = player.get_rect()
 
-    # X軸方向の移動と、足場の【左右】の当たり判定
+    # X軸方向の移動と、画面端の当たり判定
     rect.x += player.get_vel_x()
     if rect.left < 0:
         rect.left = 0
@@ -158,8 +205,12 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
         player.set_vel_x(player.get_vel_x() * -0.5)
         player.set_direction(-1)
 
-    # 追加：足場の左右側面との衝突をチェック
+    # 足場の左右側面との衝突をチェック
     for plat in platforms:
+        # 紫の床（fake）の場合は左右の判定を完全に無視する
+        if plat.get_type() == "fake":
+            continue
+
         plat_rect = plat.get_rect()
         if rect.colliderect(plat_rect):
             if player.get_vel_x() > 0:  # 右移動中に衝突
@@ -187,11 +238,12 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
     player.set_on_ground(False)
     player.set_on_ice(False)
 
-    # 足場の判定ループ（インデントを修正して中に一括で格納）
+    # 足場の上下の判定ループ
     for plat in platforms:
+        # 紫の床（fake）の場合は上下の判定も完全に無視する
         if plat.get_type() == "fake":
             continue
-                
+
         plat_rect = plat.get_rect()
         if rect.colliderect(plat_rect):
             # もともとの上面判定（落下中の着地判定）
@@ -225,14 +277,13 @@ def update_player(player, keys, platforms, goal_block, jump_sound):
                     player.set_on_ground(True)
                     break
 
-            # 追加：上昇中に足場の【下側（天井部分）】に頭をぶつけた判定
+            # 上昇中に足場の【下側（天井部分）】に頭をぶつけた判定
             elif player.get_vel_y() < 0:
                 rect.top = plat_rect.bottom
                 player.set_vel_y(0)  # 上昇を止める
                 break
 
 def draw_ui(screen, font, player, current_floor, total_floors, current_height, max_height):
-
     # UIのサイズ
     panel_x = 10
     panel_y = 10
@@ -243,6 +294,7 @@ def draw_ui(screen, font, player, current_floor, total_floors, current_height, m
     panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
     pygame.draw.rect(screen, DARK_PANEL, panel_rect, border_radius=12)
     pygame.draw.rect(screen, PANEL_BORDER, panel_rect, 2, border_radius=12)
+    
     # タイトル
     title_text = font.render("STATUS", True, GOLD)
     screen.blit(title_text, (panel_x + 15, panel_y + 10))
@@ -258,6 +310,11 @@ def draw_ui(screen, font, player, current_floor, total_floors, current_height, m
     # 最高到達点
     max_text = font.render(f"Best: {max_height // 10} m", True, ORANGE)
     screen.blit(max_text, (panel_x + 180, panel_y + 70))
+
+    # クリエイティブモードの表示
+    if player.get_is_creative():
+        creative_text = font.render("[ CREATIVE MODE ]", True, (255, 100, 255))
+        screen.blit(creative_text, (panel_x + 5, panel_y + panel_h + 5))
 
 
 # ==========================================
@@ -395,18 +452,17 @@ def main():
         player_draw_y = p_rect.y - camera_y
         screen.blit(player.get_image(), (p_rect.x, player_draw_y))
 
-        if player.get_is_charging() and not player.get_is_clear():
+        # 通常モードかつ溜め中のみゲージを表示
+        if player.get_is_charging() and not player.get_is_clear() and not player.get_is_creative():
             gauge_width = (player.get_charge_power() / player.get_max_charge()) * 40
             pygame.draw.rect(screen, COLOR_RED_UI, (p_rect.centerx - 20, player_draw_y - 15, gauge_width, 8))
         
         arrow_x = p_rect.right + 5 if player.get_direction() == 1 else p_rect.left - 10
         pygame.draw.rect(screen, WHITE, (arrow_x, player_draw_y + 15, 5, 5))
 
-        ui_text = font.render(f"Floor: {display_floor} / {TOTAL_FLOORS}   Max: {max_height // 10}m", True, WHITE)
-        screen.blit(ui_text, (10, 10))
-
         # 情報表示 (UI)
         draw_ui(screen, font, player, current_floor, TOTAL_FLOORS, current_height, max_height)
+        
         if player.get_is_clear():
             clear_text = large_font.render("CLEAR!!", True, GOLD)
             text_rect = clear_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
